@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0f14" />
+<meta name="description" content="純網頁版台股即時監控：免安裝、開網址就看，支援自選股、到價提醒、漲跌幅與爆量警示。" />
+<title>台股即時監控</title>
+<style>
+  :root{
+    --bg:#0b0f14;
+    --panel:#121821;
+    --panel2:#182231;
+    --line:#22303f;
+    --text:#e8eef7;
+    --muted:#8ba0b6;
+    --up:#ff4d4f;
+    --down:#12b886;
+    --flat:#9aa7b4;
+    --accent:#3d8bfd;
+    --warn:#ffb020;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(1100px 560px at 50% -220px,#16202c 0%,var(--bg) 62%);
+    color:var(--text);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:calc(28px + env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:18px 16px 0}
+  @media (max-width:560px){ .wrap{padding:12px 12px 0} }
+
+  /* ---------- top bar ---------- */
+  header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .brand{display:flex;align-items:center;gap:11px;min-width:0}
+  .logo{
+    width:42px;height:42px;border-radius:12px;flex:0 0 auto;
+    background:linear-gradient(145deg,#3d8bfd,#1f4fd8);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:19px;letter-spacing:.5px;
+    box-shadow:0 6px 18px -6px rgba(61,139,253,.75);
+  }
+  h1{font-size:19px;margin:0;letter-spacing:.3px;font-weight:700}
+  .sub{margin:2px 0 0;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--flat);display:inline-block;flex:0 0 auto}
+  .dot.live{background:var(--down);box-shadow:0 0 0 0 rgba(18,184,134,.6);animation:pulse 2s infinite}
+  .dot.closed{background:var(--flat)}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(18,184,134,.55)}
+    70%{box-shadow:0 0 0 8px rgba(18,184,134,0)}
+    100%{box-shadow:0 0 0 0 rgba(18,184,134,0)}
+  }
+  .topActions{margin-left:auto;display:flex;gap:8px}
+
+  button{
+    font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);padding:8px 13px;transition:.15s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button:hover{border-color:#31465c;background:#1d2a3a}
+  button:active{transform:scale(.98)}
+  button.primary{
+    background:linear-gradient(145deg,#3d8bfd,#2160d8);border-color:transparent;font-weight:600;
+    box-shadow:0 6px 16px -8px rgba(61,139,253,.9);
+  }
+  button.primary:hover{filter:brightness(1.06)}
+  button.ghost{background:transparent}
+  button.ghost.on{border-color:var(--accent);color:#bfd8ff}
+  button.icon{padding:6px 9px;line-height:1;font-size:13px;color:var(--muted)}
+
+  /* ---------- add bar ---------- */
+  .toolbar{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px;margin-bottom:14px;
+  }
+  form.add{display:flex;gap:8px;flex-wrap:wrap}
+  input[type=text],input[type=number],select{
+    font:inherit;background:#0d131b;border:1px solid var(--line);color:var(--text);
+    border-radius:10px;padding:10px 12px;outline:none;min-width:0;
+  }
+  input[type=text]:focus,input[type=number]:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(61,139,253,.16)}
+  #codeInput{flex:1 1 190px}
+  .hint{font-size:12px;color:var(--muted);margin-top:9px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .hint b{color:#b9cade;font-weight:600}
+
+  /* ---------- summary ---------- */
+  .summary{
+    display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;
+  }
+  .pill{
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;
+    padding:6px 12px;font-size:12.5px;color:var(--muted);
+  }
+  .pill b{color:var(--text);font-variant-numeric:tabular-nums}
+
+  /* ---------- cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+  @media (max-width:560px){ .cards{grid-template-columns:1fr} }
+
+  .card{
+    background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px 12px;
+    position:relative;overflow:hidden;
+  }
+  .card::before{
+    content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--flat);opacity:.55;
+  }
+  .card.up::before{background:var(--up);opacity:1}
+  .card.down::before{background:var(--down);opacity:1}
+
+  .cardHead{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px}
+  .ident{display:flex;align-items:baseline;gap:8px;min-width:0;flex-wrap:wrap}
+  .code{font-weight:800;font-size:15px;letter-spacing:.6px;font-variant-numeric:tabular-nums}
+  .name{font-size:14px;color:#cddaea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:11em}
+  .tag{
+    font-size:10.5px;padding:1.5px 6px;border-radius:999px;border:1px solid var(--line);
+    color:var(--muted);letter-spacing:.4px;
+  }
+  .del{margin-left:auto;flex:0 0 auto}
+
+  .priceRow{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:2px}
+  .price{font-size:27px;font-weight:750;letter-spacing:-.4px;font-variant-numeric:tabular-nums}
+  .chg{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums}
+  .up{color:var(--up)}
+  .down{color:var(--down)}
+  .flat{color:var(--flat)}
+
+  .spark{width:100%;height:38px;display:block;margin:6px 0 8px;opacity:.95}
+  .spark.empty{opacity:0}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px 8px}
+  .stat{background:#0e141c;border:1px solid #1b2735;border-radius:9px;padding:6px 8px;min-width:0}
+  .stat label{display:block;font-size:10.5px;color:var(--muted);letter-spacing:.3px;margin-bottom:1px}
+  .stat b{font-size:13px;font-weight:650;font-variant-numeric:tabular-nums;display:block;overflow:hidden;text-overflow:ellipsis}
+
+  .badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;min-height:20px}
+  .badge{
+    font-size:11px;padding:2.5px 8px;border-radius:999px;font-weight:600;letter-spacing:.2px;
+    background:#16202c;border:1px solid var(--line);color:#a9bdd2;
+  }
+  .badge.hot{background:rgba(255,77,79,.12);border-color:rgba(255,77,79,.45);color:#ffa8a9}
+  .badge.cold{background:rgba(18,184,134,.12);border-color:rgba(18,184,134,.45);color:#7de3c0}
+  .badge.warn{background:rgba(255,176,32,.12);border-color:rgba(255,176,32,.45);color:#ffd48a}
+
+  .alertBox{margin-top:10px;padding-top:9px;border-top:1px dashed #253546;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .alertBox span{font-size:11px;color:var(--muted)}
+  .alertBox input{width:74px;padding:5px 7px;font-size:12px;border-radius:8px;text-align:right;min-height:36px}
+
+  /* ---------- mobile ---------- */
+  @media (max-width:560px){
+    form.add{flex-direction:column}
+    #codeInput{flex:1 1 auto;width:100%}
+    form.add button.primary{width:100%;padding:13px;font-size:15px}
+    .stats{grid-template-columns:repeat(2,1fr);gap:8px}
+    .stat{padding:8px 10px}
+    .stat b{font-size:14px}
+    .alertBox input{width:100%;min-height:44px;font-size:14px;padding:10px}
+    .alertBox{gap:8px}
+    .alertBox span{width:100%}
+    button.icon{min-width:44px;min-height:44px;font-size:16px;display:flex;align-items:center;justify-content:center}
+    .del{margin-top:-6px;margin-right:-6px}
+    .price{font-size:30px}
+    .summary{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+    .pill{flex:0 0 auto}
+    .hint{font-size:11.5px}
+    footer{font-size:12px;line-height:1.9}
+  }
+
+  /* ---------- settings ---------- */
+  details.settings{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:0;margin:16px 0 0;
+  }
+  details.settings summary{
+    cursor:pointer;padding:12px 14px;font-size:13.5px;color:#c8d8e8;list-style:none;
+    display:flex;align-items:center;gap:8px;user-select:none;
+  }
+  details.settings summary::-webkit-details-marker{display:none}
+  details.settings summary::before{content:"⚙";color:var(--muted)}
+  .setBody{padding:0 14px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+  .field input,.field select{width:100%}
+  .setNote{grid-column:1/-1;font-size:11.5px;color:#6f849a;line-height:1.6}
+
+  footer{margin:22px 0 0;font-size:11.5px;color:#5f7286;line-height:1.7}
+  footer a{color:#7b95ae}
+
+  /* ---------- toast ---------- */
+  #toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));z-index:99;display:flex;flex-direction:column;gap:8px;width:min(440px,calc(100% - 24px))}
+  .toast{
+    background:#1b2430;border:1px solid #2d4157;border-left:3px solid var(--warn);
+    border-radius:11px;padding:10px 12px;font-size:13px;box-shadow:0 12px 30px -12px #000;
+    animation:slideUp .22s ease-out;
+  }
+  .toast b{display:block;font-size:12px;color:#ffd48a;margin-bottom:2px;font-weight:700}
+  @keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  .empty{
+    border:1px dashed #2a3b4d;border-radius:var(--radius);padding:26px 18px;text-align:center;color:var(--muted);
+    font-size:13.5px;line-height:1.8;
+  }
+  .err{
+    background:rgba(255,77,79,.1);border:1px solid rgba(255,77,79,.4);color:#ffc9c9;
+    border-radius:11px;padding:9px 12px;font-size:12.5px;margin-bottom:12px;
+  }
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">台</div>
+      <div>
+        <h1>台股即時監控</h1>
+        <p class="sub">
+          <span class="dot" id="statusDot"></span>
+          <span id="statusText">準備中…</span>
+          <span style="color:#3d5166">·</span>
+          <span id="countdown">—</span>
+        </p>
+      </div>
+    </div>
+    <div class="topActions">
+      <button class="ghost" id="btnNotify" title="開啟瀏覽器通知">🔔 通知</button>
+      <button class="ghost" id="btnRefresh" title="立即更新">↻</button>
+    </div>
+  </header>
+
+  <section class="toolbar">
+    <form class="add" id="addForm" autocomplete="off">
+      <input type="text" id="codeInput" placeholder="輸入股票代號，例如 2330" inputmode="numeric" maxlength="8" aria-label="股票代號" />
+      <button class="primary" type="submit">＋ 加入監控</button>
+    </form>
+    <div class="hint">
+      <span>名單存在這台裝置的瀏覽器（localStorage），換裝置要重新加。</span>
+      <span>現在共 <b id="countNum">0</b> 檔</span>
+    </div>
+  </section>
+
+  <div id="errBox" class="err" hidden></div>
+
+  <div class="summary" id="summary"></div>
+
+  <section class="cards" id="cards" aria-live="polite"></section>
+
+  <details class="settings">
+    <summary>監控設定（門檻、刷新頻率）</summary>
+    <div class="setBody">
+      <div class="field">
+        <label>自動刷新頻率</label>
+        <select id="setInterval">
+          <option value="10">每 10 秒</option>
+          <option value="15">每 15 秒（建議）</option>
+          <option value="30">每 30 秒</option>
+          <option value="60">每 60 秒</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>漲跌幅警示門檻（%）</label>
+        <input type="number" id="setPct" min="0.5" max="20" step="0.5" />
+      </div>
+      <div class="field">
+        <label>爆量倍數（今日量 ÷ 20 日均量）</label>
+        <input type="number" id="setVol" min="1" max="10" step="0.1" />
+      </div>
+      <div class="field">
+        <label>同一則提醒的冷卻時間（分鐘）</label>
+        <input type="number" id="setCool" min="1" max="120" step="1" />
+      </div>
+      <div class="setNote">
+        提醒只在這個頁面開著的時候運作（純網頁、沒有後端）。關掉分頁就不會叫，這是刻意的設計 —— 不需要安裝、不需要伺服器，也不會有東西在你背後跑。
+      </div>
+    </div>
+  </details>
+
+  <footer>
+    資料來源：鉅亨網公開報價 API（盤中即時）、臺灣證券交易所公開資料（20 日均量）。報價可能有 10～20 秒延遲，非交易所官方即時行情，僅供個人參考。<br />
+    本頁為公開資料的整理工具，<b>不構成任何投資建議</b>，亦不保證資料正確或完整；投資決策請自行判斷並承擔風險。
+  </footer>
+</div>
+
+<div id="toasts" aria-live="assertive"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------ *
+   * 常數
+   * ------------------------------------------------------------------ */
+  var API = "https://ws.api.cnyes.com/ws/api/v1/quote/quotes/";
+  var TWSE_DAY = "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY";
+  var KEY_LIST = "twstock.web.watchlist.v1";
+  var KEY_CFG  = "twstock.web.config.v1";
+  var KEY_ALERT= "twstock.web.alertlog.v1";
+  var KEY_AVG  = "twstock.web.avg20.v1";
+  var KEY_LISTED = "twstock.web.listed.v1";
+
+  var DEFAULT_LIST = [
+    { code: "2330", market: "TWS" },
+    { code: "2317", market: "TWS" },
+    { code: "2454", market: "TWS" },
+    { code: "6488", market: "TWS" }
+  ];
+
+  var DEFAULT_CFG = {
+    interval: 15,
+    pctAlert: 5,
+    volRatio: 2,
+    cooldownMin: 5,
+    notify: false
+  };
+
+  /* ------------------------------------------------------------------ *
+   * 狀態
+   * ------------------------------------------------------------------ */
+  var state = {
+    list: [],
+    cfg: Object.assign({}, DEFAULT_CFG),
+    quotes: {},      // code -> 正規化報價
+    hist: {},        // code -> [{t,p}]
+    avg20: {},       // code -> {month, avg}
+    listed: {},      // code -> true(上市) / false(上櫃)
+    alerts: {},      // "code:kind" -> ts
+    cards: {},       // code -> {el, refs}
+    nextAt: 0,
+    loading: false,
+    lastOk: 0,
+    lastErr: ""
+  };
+
+  /* ------------------------------------------------------------------ *
+   * 小工具
+   * ------------------------------------------------------------------ */
+  function $(id) { return document.getElementById(id); }
+
+  function lsGet(key, fallback) {
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      var v = JSON.parse(raw);
+      return v == null ? fallback : v;
+    } catch (e) { return fallback; }
+  }
+  function lsSet(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* 私密模式可能失敗 */ }
+  }
+
+  function num(v) {
+    if (v === null || v === undefined || v === "" || v === "-") return null;
+    var n = typeof v === "number" ? v : parseFloat(String(v).replace(/,/g, ""));
+    return isFinite(n) ? n : null;
+  }
+
+  function fmtPrice(n) {
+    if (n === null || n === undefined || !isFinite(n)) return "—";
+    // 台股報價統一顯示兩位小數，避免同一頁 2385.0 與 245.00 混用
+    return n.toLocaleString("zh-TW", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function fmtSigned(n, digits) {
+    if (n === null || n === undefined || !isFinite(n)) return "—";
+    var s = Math.abs(n).toFixed(digits == null ? 2 : digits);
+    var sign = n > 0 ? "+" : (n < 0 ? "−" : "");
+    return sign + s;
+  }
+
+  function fmtLots(n) {
+    if (n === null || n === undefined || !isFinite(n)) return "—";
+    if (n >= 10000) return Math.round(n).toLocaleString("zh-TW");
+    return n.toLocaleString("zh-TW", { maximumFractionDigits: 0 });
+  }
+
+  function hhmmssFromTs(sec) {
+    if (!sec) return "—";
+    try {
+      return new Date(sec * 1000).toLocaleTimeString("zh-TW", {
+        hour12: false, timeZone: "Asia/Taipei",
+        hour: "2-digit", minute: "2-digit", second: "2-digit"
+      });
+    } catch (e) { return "—"; }
+  }
+
+  /* 台北時間的「現在」 */
+  function taipeiNow() {
+    var f = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Taipei", hour12: false,
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", weekday: "short"
+    });
+    var p = {};
+    f.formatToParts(new Date()).forEach(function (x) { p[x.type] = x.value; });
+    var wd = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[p.weekday];
+    return {
+      h: parseInt(p.hour, 10) % 24,
+      m: parseInt(p.minute, 10),
+      s: parseInt(p.second, 10),
+      weekday: wd,
+      dateKey: p.year + "-" + p.month + "-" + p.day
+    };
+  }
+
+  /* 市場狀態：盤中 / 收盤 / 非交易日 */
+  function marketState() {
+    var t = taipeiNow();
+    var mins = t.h * 60 + t.m;
+    if (t.weekday === 0 || t.weekday === 6) return { open: false, label: "非交易日（週末）" };
+    if (mins < 9 * 60) return { open: false, label: "未開盤（09:00 開盤）" };
+    if (mins > 13 * 60 + 30) return { open: false, label: "已收盤（13:30 收盤）" };
+    return { open: true, label: "盤中即時" };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * localStorage 讀寫
+   * ------------------------------------------------------------------ */
+  function loadState() {
+    var list = lsGet(KEY_LIST, null);
+    state.list = Array.isArray(list) ? list.filter(function (x) {
+      return x && /^[0-9A-Z]{4,8}$/.test(String(x.code));
+    }) : DEFAULT_LIST.slice();
+
+    var cfg = lsGet(KEY_CFG, {});
+    state.cfg = Object.assign({}, DEFAULT_CFG, cfg || {});
+
+    state.alerts = lsGet(KEY_ALERT, {}) || {};
+    state.avg20 = lsGet(KEY_AVG, {}) || {};
+    state.listed = lsGet(KEY_LISTED, {}) || {};
+  }
+
+  function saveList() { lsSet(KEY_LIST, state.list); }
+  function saveCfg() { lsSet(KEY_CFG, state.cfg); }
+
+  /* ------------------------------------------------------------------ *
+   * 資料抓取
+   * ------------------------------------------------------------------ */
+  function symOf(item) {
+    // 實測：TWS 前綴對上市與上櫃個股都能查到報價，統一使用可避免市場判斷錯誤
+    return "TWS:" + item.code + ":STOCK";
+  }
+
+  function normalize(q) {
+    var price = num(q["6"]);
+    var prev = num(q["21"]);
+    var chg = num(q["11"]);
+    var pct = num(q["56"]);
+    if (pct === null && chg !== null && prev) pct = chg / prev * 100;
+    return {
+      code: String(q["200010"] || "").trim(),
+      name: String(q["200009"] || "").trim(),
+      price: price,
+      prev: prev,
+      change: chg,
+      pct: pct,
+      open: num(q["19"]),
+      high: num(q["12"]),
+      low: num(q["13"]),
+      limitUp: num(q["75"]),
+      limitDown: num(q["76"]),
+      volume: num(q["200013"]),     // 張
+      amount: num(q["200067"]),     // 元
+      ts: num(q["200007"])          // 秒
+    };
+  }
+
+  function fetchQuotes(items) {
+    if (!items.length) return Promise.resolve([]);
+    var url = API + items.map(symOf).join(",");
+    return fetch(url, { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("報價服務回應 HTTP " + r.status);
+      return r.json();
+    }).then(function (j) {
+      if (!j || !Array.isArray(j.data)) {
+        throw new Error((j && j.message) ? String(j.message) : "報價服務回應格式異常");
+      }
+      return j.data.map(normalize).filter(function (q) { return q.code; });
+    });
+  }
+
+  function fetchOne(item) {
+    return fetchQuotes([item]).then(function (arr) {
+      return arr.length ? arr[0] : null;
+    });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 20 日均量（僅上市；上櫃資料源未開放跨網域）
+   * ------------------------------------------------------------------ */
+  function monthKey(d) { return d.getFullYear() + "" + String(d.getMonth() + 1).padStart(2, "0"); }
+
+  function avg20For(code, onDone) {
+    var d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);           // 抓「上個月」的日線，約 20 個交易日
+    var mk = monthKey(d);
+
+    var cached = state.avg20[code];
+    if (cached && cached.month === mk && isFinite(cached.avg)) { onDone(cached.avg, ""); return; }
+
+    var date = mk + "01";
+    fetch(TWSE_DAY + "?date=" + date + "&stockNo=" + code + "&response=json", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var rows = (j && j.data) || [];
+        var lots = [];
+        for (var i = 0; i < rows.length; i++) {
+          var shares = num(rows[i][1]);
+          if (shares && shares > 0) lots.push(shares / 1000);
+        }
+        if (!lots.length) {
+          // TWSE 查不到日線 → 這檔是上櫃（或非上市個股）
+          state.listed[code] = false;
+          lsSet(KEY_LISTED, state.listed);
+          onDone(null, "上櫃個股無 20 日均量");
+          return;
+        }
+        state.listed[code] = true;
+        lsSet(KEY_LISTED, state.listed);
+        var tail = lots.slice(-20);
+        var avg = tail.reduce(function (a, b) { return a + b; }, 0) / tail.length;
+        state.avg20[code] = { month: mk, avg: avg };
+        lsSet(KEY_AVG, state.avg20);
+        onDone(avg, "");
+      })
+      .catch(function () { onDone(null, "20 日均量暫時取不到"); });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 卡片 DOM（建立一次，之後只更新數字，避免輸入框失焦）
+   * ------------------------------------------------------------------ */
+  function buildCard(item) {
+    var el = document.createElement("article");
+    el.className = "card";
+    el.innerHTML = [
+      '<div class="cardHead">',
+      '  <div class="ident">',
+      '    <span class="code"></span><span class="name"></span><span class="tag"></span>',
+      '  </div>',
+      '  <button class="icon del" title="移除">✕</button>',
+      '</div>',
+      '<div class="priceRow"><span class="price">—</span><span class="chg flat">—</span></div>',
+      '<svg class="spark empty" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">',
+      '  <polyline fill="none" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" points=""></polyline>',
+      '</svg>',
+      '<div class="stats">',
+      '  <div class="stat"><label>開盤</label><b data-f="open">—</b></div>',
+      '  <div class="stat"><label>最高</label><b data-f="high">—</b></div>',
+      '  <div class="stat"><label>最低</label><b data-f="low">—</b></div>',
+      '  <div class="stat"><label>成交量(張)</label><b data-f="vol">—</b></div>',
+      '  <div class="stat"><label>量比</label><b data-f="ratio">—</b></div>',
+      '  <div class="stat"><label>更新</label><b data-f="time">—</b></div>',
+      '</div>',
+      '<div class="badges" data-f="badges"></div>',
+      '<div class="alertBox">',
+      '  <span>到價提醒</span>',
+      '  <input type="number" step="0.5" placeholder="上限" data-f="upper" aria-label="到價上限" />',
+      '  <input type="number" step="0.5" placeholder="下限" data-f="lower" aria-label="到價下限" />',
+      '</div>'
+    ].join("");
+
+    var refs = {
+      code: el.querySelector(".code"),
+      name: el.querySelector(".name"),
+      tag: el.querySelector(".tag"),
+      price: el.querySelector(".price"),
+      chg: el.querySelector(".chg"),
+      spark: el.querySelector(".spark polyline"),
+      sparkEl: el.querySelector(".spark"),
+      open: el.querySelector('[data-f="open"]'),
+      high: el.querySelector('[data-f="high"]'),
+      low: el.querySelector('[data-f="low"]'),
+      vol: el.querySelector('[data-f="vol"]'),
+      ratio: el.querySelector('[data-f="ratio"]'),
+      time: el.querySelector('[data-f="time"]'),
+      badges: el.querySelector('[data-f="badges"]'),
+      upper: el.querySelector('[data-f="upper"]'),
+      lower: el.querySelector('[data-f="lower"]')
+    };
+
+    refs.code.textContent = item.code;
+    refs.name.textContent = "讀取中…";
+    refs.tag.textContent = item.market === "OTC" ? "上櫃" : "上市";
+
+    el.querySelector(".del").addEventListener("click", function () { removeStock(item.code); });
+
+    function bindAlert(input, field) {
+      var saved = lsGet("twstock.web.alert." + item.code, {}) || {};
+      if (saved[field] != null) input.value = saved[field];
+      input.addEventListener("change", function () {
+        var cur = lsGet("twstock.web.alert." + item.code, {}) || {};
+        var v = num(input.value);
+        if (v === null) delete cur[field]; else cur[field] = v;
+        lsSet("twstock.web.alert." + item.code, cur);
+      });
+    }
+    bindAlert(refs.upper, "upper");
+    bindAlert(refs.lower, "lower");
+
+    return { el: el, refs: refs };
+  }
+
+  function trendClass(v) {
+    if (v === null || v === undefined || !isFinite(v) || Math.abs(v) < 0.0001) return "flat";
+    return v > 0 ? "up" : "down";
+  }
+
+  function renderCards() {
+    var host = $("cards");
+    var wanted = {};
+
+    if (!state.list.length) {
+      host.innerHTML = '';
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      empty.innerHTML = "還沒有任何監控標的。<br />在上面輸入股票代號（例如 <b>2330</b>）按「加入監控」就會開始追蹤。";
+      empty.style.gridColumn = "1 / -1";
+      host.appendChild(empty);
+      state.cards = {};
+      $("countNum").textContent = "0";
+      return;
+    }
+
+    state.list.forEach(function (item) {
+      wanted[item.code] = true;
+      if (!state.cards[item.code]) state.cards[item.code] = buildCard(item);
+      host.appendChild(state.cards[item.code].el);   // 依名單順序重排
+    });
+
+    Object.keys(state.cards).forEach(function (code) {
+      if (!wanted[code]) {
+        var c = state.cards[code];
+        if (c && c.el && c.el.parentNode) c.el.parentNode.removeChild(c.el);
+        delete state.cards[code];
+      }
+    });
+
+    $("countNum").textContent = String(state.list.length);
+  }
+
+  function drawSpark(code, refs, pct) {
+    var h = state.hist[code] || [];
+    if (h.length < 2) { refs.sparkEl.classList.add("empty"); return; }
+    var ps = h.slice(-90).map(function (x) { return x.p; });
+    var min = Math.min.apply(null, ps), max = Math.max.apply(null, ps);
+    var span = max - min || 1;
+    var pts = ps.map(function (p, i) {
+      var x = (i / (ps.length - 1)) * 100;
+      var y = 28 - ((p - min) / span) * 26;
+      return x.toFixed(2) + "," + y.toFixed(2);
+    }).join(" ");
+    refs.spark.setAttribute("points", pts);
+    var cls = trendClass(pct);
+    refs.spark.setAttribute("stroke", cls === "up" ? "#ff4d4d" : (cls === "down" ? "#12b886" : "#8ba0b6"));
+    refs.sparkEl.classList.remove("empty");
+  }
+
+  function updateCard(item, q) {
+    var c = state.cards[item.code];
+    if (!c) return;
+    var r = c.refs;
+
+    // 代號 / 名稱 / 市場
+    if (q) {
+      r.name.textContent = q.name || item.code;
+      r.tag.textContent = state.listed[item.code] === false ? "上櫃" : "上市";
+    } else {
+      r.name.textContent = "查無此代號";
+      r.tag.textContent = "—";
+    }
+
+    var pct = q ? q.pct : null;
+    var cls = trendClass(pct);
+    c.el.classList.remove("up", "down");
+    if (cls === "up") c.el.classList.add("up");
+    if (cls === "down") c.el.classList.add("down");
+
+    // 價格
+    if (q && q.price !== null) {
+      r.price.textContent = fmtPrice(q.price);
+    } else {
+      r.price.textContent = "—";
+    }
+    r.price.className = "price " + cls;
+
+    // 漲跌 / 漲跌幅
+    if (q && (q.change !== null || q.pct !== null)) {
+      r.chg.textContent = fmtSigned(q.change, 2) + "　" + fmtSigned(q.pct, 2) + "%";
+    } else {
+      r.chg.textContent = "—";
+    }
+    r.chg.className = "chg " + cls;
+
+    // 開高低 / 量 / 量比 / 時間
+    r.open.textContent = q ? fmtPrice(q.open) : "—";
+    r.high.textContent = q ? fmtPrice(q.high) : "—";
+    r.low.textContent = q ? fmtPrice(q.low) : "—";
+    r.vol.textContent = q ? fmtLots(q.volume) : "—";
+    r.time.textContent = q ? hhmmssFromTs(q.ts) : "—";
+
+    // 量比
+    if (q && q.volume && state.avg20[item.code] && state.avg20[item.code].avg) {
+      var ratio = q.volume / state.avg20[item.code].avg;
+      r.ratio.textContent = ratio.toFixed(2) + "×";
+      r.ratio.className = ratio >= state.cfg.volRatio ? "up" : "";
+    } else {
+      r.ratio.textContent = "—";
+      r.ratio.className = "";
+    }
+
+    // 徽章（把原本 Python 版的盤中判斷簡化成看得懂的標籤）
+    var badges = [];
+    if (q && q.price !== null) {
+      if (q.limitUp && q.price >= q.limitUp - 1e-6) badges.push(["warn", "漲停"]);
+      if (q.limitDown && q.price <= q.limitDown + 1e-6) badges.push(["warn", "跌停"]);
+
+      if (pct !== null && Math.abs(pct) >= state.cfg.pctAlert) {
+        badges.push([cls === "up" ? "hot" : "cold", (pct > 0 ? "大漲 " : "大跌 ") + fmtSigned(pct, 1) + "%"]);
+      }
+      // 用「現價」跟昨收比，而不是用今日最高／最低（那兩者幾乎一定一上一下，會同時亮兩個互相矛盾的標籤）
+      if (q.prev && q.price > q.prev * 1.003) badges.push(["hot", "突破昨收 +" + ((q.price / q.prev - 1) * 100).toFixed(1) + "%"]);
+      if (q.prev && q.price < q.prev * 0.997) badges.push(["cold", "跌破昨收 " + ((q.price / q.prev - 1) * 100).toFixed(1) + "%"]);
+
+      if (q.volume && state.avg20[item.code] && state.avg20[item.code].avg) {
+        var rr = q.volume / state.avg20[item.code].avg;
+        if (rr >= state.cfg.volRatio) badges.push(["warn", "爆量 " + rr.toFixed(1) + "×"]);
+      }
+
+      if (q.prev && q.price !== null) {
+        var dev = (q.price - q.prev) / q.prev * 100;
+        if (Math.abs(dev) < 0.15 && pct !== null) badges.push(["", "貼平昨收"]);
+      }
+    }
+
+    r.badges.innerHTML = badges.map(function (b) {
+      return '<span class="badge ' + b[0] + '">' + b[1] + "</span>";
+    }).join("");
+
+    drawSpark(item.code, r, pct);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 摘要列
+   * ------------------------------------------------------------------ */
+  function renderSummary() {
+    var up = 0, down = 0, flat = 0, sum = 0, n = 0;
+    state.list.forEach(function (it) {
+      var q = state.quotes[it.code];
+      if (!q || q.pct === null) { flat++; return; }
+      if (q.pct > 0) up++; else if (q.pct < 0) down++; else flat++;
+      sum += q.pct; n++;
+    });
+
+    var t = taipeiNow();
+    var parts = [
+      '<span class="pill">上漲 <b class="up">' + up + '</b></span>',
+      '<span class="pill">下跌 <b class="down">' + down + '</b></span>',
+      '<span class="pill">平盤 <b>' + flat + '</b></span>'
+    ];
+    if (n) {
+      var avg = sum / n;
+      parts.push('<span class="pill">平均漲跌 <b class="' + trendClass(avg) + '">' + fmtSigned(avg, 2) + "%</b></span>");
+    }
+    if (state.lastOk) {
+      parts.push('<span class="pill">上次同步 <b>' + hhmmssFromTs(Math.round(state.lastOk / 1000)) + "</b></span>");
+    }
+    $("summary").innerHTML = parts.join("");
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 提醒
+   * ------------------------------------------------------------------ */
+  function alertKey(code, kind) { return code + ":" + kind; }
+
+  function canAlert(code, kind) {
+    var k = alertKey(code, kind);
+    var last = state.alerts[k] || 0;
+    var cool = Math.max(1, Number(state.cfg.cooldownMin) || 5) * 60 * 1000;
+    if (Date.now() - last < cool) return false;
+    state.alerts[k] = Date.now();
+    lsSet(KEY_ALERT, state.alerts);
+    return true;
+  }
+
+  function toast(title, body) {
+    var host = $("toasts");
+    var el = document.createElement("div");
+    el.className = "toast";
+    el.innerHTML = "<b>" + title + "</b>" + body;
+    host.appendChild(el);
+    setTimeout(function () {
+      el.style.transition = "opacity .3s, transform .3s";
+      el.style.opacity = "0";
+      el.style.transform = "translateY(8px)";
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 320);
+    }, 6000);
+  }
+
+  function notify(title, body) {
+    toast(title, body);
+    if (state.cfg.notify && "Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(title, { body: body, tag: title + body, silent: false });
+      } catch (e) { /* 部分瀏覽器（如 iOS Safari 未加入主畫面）會拒絕 */ }
+    }
+  }
+
+  function checkAlerts(item, q) {
+    if (!q || q.price === null) return;
+    var code = q.code || item.code;
+    var name = q.name || code;
+    var label = code + " " + name;
+
+    // 1) 漲跌幅門檻（對應原本的 price_trigger.change_pct_alert）
+    if (q.pct !== null && Math.abs(q.pct) >= state.cfg.pctAlert) {
+      if (canAlert(code, "pct")) {
+        notify("漲跌幅警示", label + " 目前 " + fmtSigned(q.pct, 2) + "%，已達 " + state.cfg.pctAlert + "% 門檻（成交 " + fmtPrice(q.price) + "）");
+      }
+    }
+
+    // 2) 到價提醒（對應原本的到價／突破關鍵價）
+    var cfgAlert = lsGet("twstock.web.alert." + code, {}) || {};
+    if (cfgAlert.upper != null && q.price >= cfgAlert.upper) {
+      if (canAlert(code, "upper")) notify("到價提醒", label + " 成交 " + fmtPrice(q.price) + "，已漲到上限 " + fmtPrice(cfgAlert.upper));
+    }
+    if (cfgAlert.lower != null && q.price <= cfgAlert.lower) {
+      if (canAlert(code, "lower")) notify("到價提醒", label + " 成交 " + fmtPrice(q.price) + "，已跌到下限 " + fmtPrice(cfgAlert.lower));
+    }
+
+    // 3) 爆量（對應原本的 volume_surge_ratio / 爆量突破）
+    if (q.volume && state.avg20[code] && state.avg20[code].avg) {
+      var ratio = q.volume / state.avg20[code].avg;
+      if (ratio >= state.cfg.volRatio) {
+        if (canAlert(code, "vol")) {
+          notify("爆量警示", label + " 今日量 " + fmtLots(q.volume) + " 張，為 20 日均量的 " + ratio.toFixed(2) + " 倍（門檻 " + state.cfg.volRatio + "×）");
+        }
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 主循環
+   * ------------------------------------------------------------------ */
+  function setStatus(text, live) {
+    $("statusText").textContent = text;
+    $("statusDot").className = "dot" + (live ? " live" : " closed");
+  }
+
+  function showError(msg) {
+    var box = $("errBox");
+    if (!msg) { box.hidden = true; box.textContent = ""; return; }
+    box.hidden = false;
+    box.textContent = msg;
+  }
+
+  function refresh() {
+    if (state.loading) return;
+    if (!state.list.length) {
+      renderCards();
+      renderSummary();
+      state.nextAt = Date.now() + state.cfg.interval * 1000;
+      return;
+    }
+    state.loading = true;
+    $("btnRefresh").textContent = "…";
+
+    var items = state.list.slice();
+    fetchQuotes(items).then(function (arr) {
+      var byCode = {};
+      arr.forEach(function (q) { byCode[q.code] = q; });
+
+      items.forEach(function (item) {
+        var q = byCode[item.code] || null;
+
+        state.quotes[item.code] = q;
+        if (q) {
+          pushHist(item.code, q);
+          if (!state.avg20[item.code]) {
+            avg20For(item.code, function (avg) {
+              updateCard(item, state.quotes[item.code]);
+            });
+          }
+        }
+        updateCard(item, q);
+        if (q) checkAlerts(item, q);
+      });
+
+      state.lastOk = Date.now();
+      state.lastErr = "";
+      showError("");
+      renderSummary();
+
+      var ms = marketState();
+      setStatus(ms.label, ms.open);
+    }).catch(function (e) {
+      state.lastErr = String(e && e.message ? e.message : e);
+      showError("報價更新失敗：" + state.lastErr + "。會在下一輪自動重試。若持續失敗，可能是網路或資料源暫時忙碌。");
+      setStatus("更新失敗，重試中", false);
+    }).then(function () {
+      state.loading = false;
+      $("btnRefresh").textContent = "↻";
+      state.nextAt = Date.now() + effectiveInterval() * 1000;
+    });
+  }
+
+  function effectiveInterval() {
+    var ms = marketState();
+    var base = Math.max(5, Number(state.cfg.interval) || 15);
+    return ms.open ? base : Math.max(base, 60);
+  }
+
+  function pushHist(code, q) {
+    if (!q || q.price === null) return;
+    var arr = state.hist[code] || (state.hist[code] = []);
+    var last = arr[arr.length - 1];
+    if (last && last.p === q.price && arr.length > 1) return;
+    arr.push({ t: Date.now(), p: q.price });
+    if (arr.length > 240) arr.shift();
+  }
+
+  /* 每秒更新倒數，不觸發網路 */
+  function tick() {
+    var left = Math.max(0, Math.round((state.nextAt - Date.now()) / 1000));
+    var ms = marketState();
+    if (!ms.open) {
+      $("countdown").textContent = "收盤期間每 " + effectiveInterval() + " 秒檢查一次";
+      return;
+    }
+    $("countdown").textContent = left > 0 ? (left + " 秒後更新") : "更新中…";
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 加入 / 移除
+   * ------------------------------------------------------------------ */
+  function addStock(rawCode) {
+    var code = String(rawCode || "").trim().toUpperCase().replace(/\s+/g, "");
+    if (!/^[0-9]{4,6}[A-Z]?$/.test(code)) {
+      showError("代號格式看起來不對：請輸入 4～6 位數字（ETF 可能是 6 位加字母，例如 00631L）。");
+      return;
+    }
+    if (state.list.some(function (x) { return x.code === code; })) {
+      showError(code + " 已經在監控名單裡了。");
+      return;
+    }
+    showError("");
+    $("codeInput").value = "";
+    $("codeInput").placeholder = "查詢 " + code + " 中…";
+
+    var cand = { code: code, market: "TWS" };
+    fetchOne(cand).then(function (q) {
+      if (q && q.name) {
+        state.list.push(cand);
+        saveList();
+        state.quotes[code] = q;
+        pushHist(code, q);
+        renderCards();
+        updateCard(cand, q);
+        avg20For(code, function () { updateCard(cand, q); });
+        $("codeInput").placeholder = "輸入股票代號，例如 2330";
+        renderSummary();
+        state.nextAt = 0;
+      } else {
+        $("codeInput").placeholder = "輸入股票代號，例如 2330";
+        showError("找不到 " + code + " 的報價。請確認代號是否正確（上市／上櫃都可以）。");
+      }
+    }).catch(function (e) {
+      $("codeInput").placeholder = "輸入股票代號，例如 2330";
+      showError("查詢失敗：" + (e && e.message ? e.message : e) + "。請稍後再試。");
+    });
+  }
+
+  function removeStock(code) {
+    state.list = state.list.filter(function (x) { return x.code !== code; });
+    delete state.quotes[code];
+    delete state.hist[code];
+    saveList();
+    renderCards();
+    renderSummary();
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 事件綁定
+   * ------------------------------------------------------------------ */
+  function bindUI() {
+    $("addForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      addStock($("codeInput").value);
+    });
+
+    $("btnRefresh").addEventListener("click", function () {
+      state.nextAt = 0;
+      refresh();
+    });
+
+    $("btnNotify").addEventListener("click", function () {
+      if (!("Notification" in window)) {
+        notify("此瀏覽器不支援桌面通知", "提醒仍會以頁面上的浮動訊息顯示。");
+        return;
+      }
+      if (Notification.permission === "granted") {
+        state.cfg.notify = !state.cfg.notify;
+        saveCfg();
+        syncNotifyBtn();
+        notify("通知已" + (state.cfg.notify ? "開啟" : "關閉"), state.cfg.notify ? "達到門檻時會跳系統通知。" : "之後只顯示頁面上的提醒。");
+        return;
+      }
+      Notification.requestPermission().then(function (p) {
+        state.cfg.notify = (p === "granted");
+        saveCfg();
+        syncNotifyBtn();
+        if (p === "granted") notify("通知已開啟", "達到門檻時會跳系統通知。");
+        else notify("通知未開啟", "提醒仍會以頁面上的浮動訊息顯示。");
+      });
+    });
+
+    $("setInterval").addEventListener("change", function () {
+      state.cfg.interval = Number(this.value) || 15;
+      saveCfg();
+      state.nextAt = Date.now() + effectiveInterval() * 1000;
+    });
+    $("setPct").addEventListener("change", function () {
+      var v = num(this.value);
+      state.cfg.pctAlert = (v === null || v <= 0) ? DEFAULT_CFG.pctAlert : Math.min(20, Math.max(0.5, v));
+      this.value = state.cfg.pctAlert;
+      saveCfg();
+    });
+    $("setVol").addEventListener("change", function () {
+      var v = num(this.value);
+      state.cfg.volRatio = (v === null || v <= 0) ? DEFAULT_CFG.volRatio : Math.min(10, Math.max(1, v));
+      this.value = state.cfg.volRatio;
+      saveCfg();
+    });
+    $("setCool").addEventListener("change", function () {
+      var v = num(this.value);
+      state.cfg.cooldownMin = (v === null || v <= 0) ? DEFAULT_CFG.cooldownMin : Math.min(120, Math.max(1, Math.round(v)));
+      this.value = state.cfg.cooldownMin;
+      saveCfg();
+    });
+
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) {
+        state.nextAt = 0;
+        refresh();
+      }
+    });
+  }
+
+  function syncNotifyBtn() {
+    var b = $("btnNotify");
+    var on = state.cfg.notify && ("Notification" in window) && Notification.permission === "granted";
+    b.classList.toggle("on", !!on);
+    b.textContent = on ? "🔔 已開" : "🔔 通知";
+  }
+
+  function syncSettingsUI() {
+    $("setInterval").value = String(state.cfg.interval);
+    $("setPct").value = state.cfg.pctAlert;
+    $("setVol").value = state.cfg.volRatio;
+    $("setCool").value = state.cfg.cooldownMin;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 啟動
+   * ------------------------------------------------------------------ */
+  function boot() {
+    loadState();
+    bindUI();
+    syncSettingsUI();
+    syncNotifyBtn();
+    renderCards();
+
+    var ms = marketState();
+    setStatus(ms.label, ms.open);
+
+    refresh();
+    setInterval(tick, 1000);
+
+    // 依市場狀態決定下一輪（收盤時自動放慢）
+    (function loop() {
+      var wait = Math.max(2000, state.nextAt - Date.now());
+      setTimeout(function () {
+        if (!document.hidden) refresh();
+        else state.nextAt = Date.now() + 5000;
+        loop();
+      }, wait);
+    })();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+</body>
+</html>
